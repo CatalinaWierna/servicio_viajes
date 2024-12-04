@@ -1,5 +1,5 @@
 # servicio_viajes
-Aplicación de gestión de servicio de viajes. Haciendo la carga, filtrado, eliminación y modificación de los datos en sql.  
+Aplicación de gestión de servicio de viajes. Haciendo la carga, filtrado, eliminación y modificación de los datos en sql. Vale aclarar, que no puedo usar mas de un archivo py.
 Proyecto Nivel Inicial: 
 
     La idea de este proyecto es hacer una aplicación encargada de gestionar viajes. Las 
