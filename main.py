@@ -2,6 +2,7 @@ from tkinter import *
 from tkinter.messagebox import *
 from tkinter import messagebox
 import sqlite3
+import re
 
 """VARIABLES GLOBALES----------------------------------------------------------------------------------------------------------------------------------------------"""
 nombre_app = "Servicio de Viajes"
@@ -48,8 +49,9 @@ def acceso_bd():
     con = sqlite3.connect("carpool.db")
     return con
 
-def confirmar(tipo_confirmacion,data):
+def confirmar(tipo_confirmacion,info):
     global boton_seleccionado
+    data = info.get()
     proceso_Exitoso = True
     if askyesno(tipo_confirmacion,'Desea '+tipo_confirmacion+' el viaje'):
         if(tipo_confirmacion == "eliminar"):
@@ -61,19 +63,48 @@ def confirmar(tipo_confirmacion,data):
     else:
         showinfo('No '+tipo_confirmacion, 'Volver a la pantalla principal')
     proceso_Exitoso = True
+    data.set("")
 
 
-def agregar_tabla(origen,destino,fecha,id_chofer,asientos_disp,frame,canvas):
-    if origen in ciudades_argentina and destino in ciudades_argentina:
-        con = acceso_bd()
-        cursor = con.cursor()
-        data = (int(id_chofer), str(origen), str(destino), str(fecha), int(asientos_disp))
-        sql ="INSERT INTO viajes(id_chofer,origen,destino,fecha,asientos_disp) VALUES(?, ?, ?, ?, ?);"
-        cursor.execute(sql,data)
-        con.commit()
-        agregar_scroll_viaje(origen,destino,fecha,asientos_disp,id_chofer,frame,canvas)
+def agregar_tabla(ori,dest,fec,id,asientos,frame,canvas):
+    origen = str(ori.get())
+    destino = str(dest.get())
+    fecha = str(fec.get())
+    id_chofer = int(id.get())
+    asientos_disp = int(asientos.get())
+    if validar_fecha(fecha) and validar_id_chofer(id_chofer):
+        if origen in ciudades_argentina and destino in ciudades_argentina:
+            con = acceso_bd()
+            cursor = con.cursor()
+            data = (id_chofer,origen, destino,fecha, asientos_disp)
+            sql ="INSERT INTO viajes(id_chofer,origen,destino,fecha,asientos_disp) VALUES(?, ?, ?, ?, ?);"
+            cursor.execute(sql,data)
+            con.commit()
+            agregar_scroll_viaje(origen,destino,fecha,asientos_disp,id_chofer,frame,canvas)
+        else:
+            messagebox.showerror("Error","Error: el origen o destino no esta disponible")
     else:
-        messagebox.showerror("Error","Error: el origen o destino no esta disponible")
+        messagebox.showerror("Error", "El id o fecha ingresados no es/son valido/s. El ID debe tener cuatro digitos, y la fecha debe tener formato DD-MM-AAAA")
+    ori.set("")
+    dest.set("")
+    fec.set("")
+    id.set("")
+    asientos.set("")
+
+def validar_fecha(fecha):
+    patron = r'^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-(\d{4})$'
+    if re.match(patron, fecha):
+        return True
+    else:
+        return False
+
+def validar_id_chofer(id_chofer):
+    patron = r"^\d{4}$"
+    if re.match(patron, id_chofer):
+        return True
+    else:
+        return False
+
 
 def agregar_scroll_viaje(origen,destino,fecha,asientos_disp,id_chofer,frame,canvas):
     global viaje_seleccionado, contador_fila
@@ -257,7 +288,7 @@ entry_choferId_label.grid(row=20,column=1)
 
 #Boton para finalizar carga
 
-load_button = Button(load_frame,text="ACEPTAR", font=("Arial",8), bg=colores["botones claro"],command=lambda:agregar_tabla(origen.get(),destino.get(),fecha.get(),chofer_id.get(),asientos_disp.get(),frame_interior,canvas))
+load_button = Button(load_frame,text="ACEPTAR", font=("Arial",8), bg=colores["botones claro"],command=lambda:agregar_tabla(origen,destino,fecha,chofer_id,asientos_disp,frame_interior,canvas))
 load_button.grid(row=290,column=174)
 
 cargar_viajes_guardados(frame_interior,canvas)
@@ -276,7 +307,7 @@ cant_asientos_reserva = IntVar()
 entry_asientos_label = Entry(frame_selected, width=18, textvariable=cant_asientos_reserva)
 entry_asientos_label.grid(row=4,column=1)
 
-load_button = Button(frame_selected,text="RESERVAR", font=("Arial",8), command=lambda:confirmar("reservar",cant_asientos_reserva.get()),bg=colores["botones claro"])
+load_button = Button(frame_selected,text="RESERVAR", font=("Arial",8), command=lambda:confirmar("reservar",cant_asientos_reserva),bg=colores["botones claro"])
 load_button.grid(row=299,column=174)
 
 
@@ -297,7 +328,7 @@ entry_choferId_label = Entry(frame_delete,textvariable = id_a_eliminar)
 entry_choferId_label.grid(row=4,column=1)
 
 
-load_button = Button(frame_delete,text="ELIMINAR", font=("Arial",8),width=9, command=lambda:confirmar("eliminar", id_a_eliminar.get()),bg=colores["botones claro"])
+load_button = Button(frame_delete,text="ELIMINAR", font=("Arial",8),width=9, command=lambda:confirmar("eliminar", id_a_eliminar),bg=colores["botones claro"])
 load_button.grid(row=299,column=174)
 
 
