@@ -1,8 +1,8 @@
 from tkinter import *
 from tkinter.messagebox import *
 from tkinter import messagebox
-import sqlite3
 import re
+import modelo
 
 """VARIABLES GLOBALES----------------------------------------------------------------------------------------------------------------------------------------------"""
 nombre_app = "Servicio de Viajes"
@@ -45,9 +45,6 @@ ciudades_argentina = [
 ]
 """FUNCIONES -------------------------------------------------------------------------------------------------------------------------------------------------------"""
 
-def acceso_bd():
-    con = sqlite3.connect("carpool.db")
-    return con
 
 def confirmar(tipo_confirmacion,info):
     global boton_seleccionado
@@ -62,8 +59,7 @@ def confirmar(tipo_confirmacion,info):
             showinfo(tipo_confirmacion, 'Viaje '+tipo_confirmacion[:-1]+'do exitosamente')
     else:
         showinfo('No '+tipo_confirmacion, 'Volver a la pantalla principal')
-    proceso_Exitoso = True
-    data.set("")
+    info.set("")
 
 
 def agregar_tabla(ori,dest,fec,id,asientos,frame,canvas):
@@ -73,16 +69,11 @@ def agregar_tabla(ori,dest,fec,id,asientos,frame,canvas):
     id_chofer = int(id.get())
     asientos_disp = int(asientos.get())
     if validar_fecha(fecha) and validar_id_chofer(id_chofer):
-        if origen in ciudades_argentina and destino in ciudades_argentina:
-            con = acceso_bd()
-            cursor = con.cursor()
-            data = (id_chofer,origen, destino,fecha, asientos_disp)
-            sql ="INSERT INTO viajes(id_chofer,origen,destino,fecha,asientos_disp) VALUES(?, ?, ?, ?, ?);"
-            cursor.execute(sql,data)
-            con.commit()
+        if origen in ciudades_argentina and destino in ciudades_argentina and id_unico(id_chofer):
+            modelo.agregar_viaje_BD(id_chofer,origen,destino,fecha,asientos_disp)
             agregar_scroll_viaje(origen,destino,fecha,asientos_disp,id_chofer,frame,canvas)
         else:
-            messagebox.showerror("Error","Error: el origen o destino no esta disponible")
+            messagebox.showerror("Error","Error: el origen o destino no esta disponible, o el ID ya existe")
     else:
         messagebox.showerror("Error", "El id o fecha ingresados no es/son valido/s. El ID debe tener cuatro digitos, y la fecha debe tener formato DD-MM-AAAA")
     ori.set("")
@@ -100,10 +91,23 @@ def validar_fecha(fecha):
 
 def validar_id_chofer(id_chofer):
     patron = r"^\d{4}$"
-    if re.match(patron, id_chofer):
+    if re.match(patron, str(id_chofer)):
         return True
     else:
         return False
+
+def id_unico(id_chofer):
+    con= modelo.acceso_bd()
+    cursor = con.cursor()
+    sql = "SELECT id_chofer FROM viajes"
+    cursor.execute(sql)
+    filas = cursor.fetchall()
+    esta = True
+    for row in filas:
+        if row == id_chofer:
+            esta = False
+    return esta
+
 
 
 def agregar_scroll_viaje(origen,destino,fecha,asientos_disp,id_chofer,frame,canvas):
@@ -116,42 +120,26 @@ def agregar_scroll_viaje(origen,destino,fecha,asientos_disp,id_chofer,frame,canv
     lista_viajes.append([viaje_btn,[origen,destino,fecha,asientos_disp,id_chofer],True])
      
 def seleccionar_viaje(viaje_btn):
-        global viaje_seleccionado,id_boton_seleccionado
-        if viaje_seleccionado:
+    global viaje_seleccionado, id_boton_seleccionado
+    if viaje_seleccionado:
+        try:
             viaje_seleccionado.config(bg=colores["botones claro"])
-        viaje_btn.config(bg="lightblue")
-        id_boton_seleccionado = buscar_viaje_por_boton(viaje_btn)
-        print(id_boton_seleccionado)
-        viaje_seleccionado = viaje_btn
-
+        except TclError:
+            # Si el botón ya no existe, simplemente lo ignoramos
+            pass
+    viaje_btn.config(bg="lightblue")
+    id_boton_seleccionado = buscar_viaje_por_boton(viaje_btn)
+    viaje_seleccionado = viaje_btn
 
 def eliminar_por_id (id_buscar):
-    con= acceso_bd()
-    cursor = con.cursor()
-    data = (id_buscar, )
-    sql="DELETE FROM viajes WHERE id_chofer = ?;"
-    cursor.execute(sql,data)
-    con.commit()
+    modelo.eliminar_por_id_BD(id_buscar)
     for viaje in lista_viajes:
         if(viaje[1][4]==id_buscar):
             viaje[0].destroy()
 
 
-def actualizar_asientos_viaje (nueva_cant_asientos, id_chofer):
-    con= acceso_bd()
-    cursor = con.cursor()
-    data = (nueva_cant_asientos,id_chofer)
-    sql="UPDATE viajes SET asientos_disp = ? WHERE id_chofer = ?;"
-    cursor.execute(sql,data)
-    con.commit()
-
 def cargar_viajes_guardados(frame,canvas):
-    con= acceso_bd()
-    cursor = con.cursor()
-    sql = "SELECT * FROM viajes"
-    cursor.execute(sql)
-    filas = cursor.fetchall()
-    for row in filas:
+    for row in modelo.viajes_en_BD():
         agregar_scroll_viaje(row[1],row[2],row[3],row[4],row[0],frame,canvas)
         
 def filtrar(origen="", destino="", fecha=""):
@@ -186,7 +174,7 @@ def reservar_asientos(cant_asientos,id_chofer):
         if viaje[1][4] == id_chofer :
             if(viaje[1][3] > cant_asientos):
                 viaje[1][3] -= cant_asientos
-                actualizar_asientos_viaje (viaje[1][3], id_chofer)
+                modelo.actualizar_asientos_viaje (viaje[1][3], id_chofer)
                 return True
             else:
                 if viaje[1][3] == cant_asientos:
@@ -198,7 +186,8 @@ def reservar_asientos(cant_asientos,id_chofer):
                     messagebox.showerror("Error","Error: no hay suficientes asientos disponibles")
                     return False
 
-
+#Accedo a la base de datos
+modelo.primer_acceso()
 
 """INICIO DE LA INTERFAZ GRAFICA------------------------------------------------------------------------------------------------------------------------"""
 
