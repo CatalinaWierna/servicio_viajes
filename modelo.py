@@ -1,56 +1,61 @@
 import sqlite3
-def primer_acceso ():
-    try:
-        acceso_bd()
-        crear_tabla()
-    except:
-        print("Hay un error")
+from peewee import *
+from tkinter import *
+from tkinter.messagebox import *
+from tkinter import messagebox
 
-def acceso_bd():
-    con = sqlite3.connect("carpool.db")
-    return con
+db = SqliteDatabase('carpool.db')
 
-def crear_tabla():
-    con = acceso_bd()
-    cursor = con.cursor()
-    sql = """CREATE TABLE IF NOT EXISTS viajes (
-            id_chofer               INTEGER      PRIMARY KEY,
-            origen                TEXT,
-            destino       TEXT,
-            fecha INTEGER TEXT,
-            asientos_disp INTEGER
-        )
-    """
-    cursor.execute(sql)
-    con.commit()
+class BaseModel(Model):
+    class Meta:
+        database = db
 
-def viajes_en_BD ():
-    con= acceso_bd()
-    cursor = con.cursor()
-    sql = "SELECT * FROM viajes"
-    cursor.execute(sql)
-    return cursor.fetchall()
+#Esto representa mi tabla de viajes
+class Viaje(BaseModel):
+    id_chofer = IntegerField(primary_key=True, unique=True)
+    origen = CharField()
+    destino = CharField()
+    fecha = CharField()
+    asientos_disp = IntegerField()
 
-def eliminar_por_id_BD (id):
-    con= acceso_bd()
-    cursor = con.cursor()
-    data = (id, )
-    sql="DELETE FROM viajes WHERE id_chofer = ?;"
-    cursor.execute(sql,data)
-    con.commit()
+db.connect()
+db.create_tables([Viaje])
+class Base ():
+    def __init__ (self,):pass
 
-def actualizar_asientos_viaje (nueva_cant_asientos, id_chofer):
-    con= acceso_bd()
-    cursor = con.cursor()
-    data = (nueva_cant_asientos,id_chofer)
-    sql="UPDATE viajes SET asientos_disp = ? WHERE id_chofer = ?;"
-    cursor.execute(sql,data)
-    con.commit()
-
-def agregar_viaje_BD(id,origen,destino,fecha,asientos_disp): 
-    con = acceso_bd()
-    cursor = con.cursor()
-    data = (int(id),origen, destino,fecha, asientos_disp)
-    sql ="INSERT INTO viajes(id_chofer,origen,destino,fecha,asientos_disp) VALUES(?, ?, ?, ?, ?);"
-    cursor.execute(sql,data)
-    con.commit()
+    #Alta de registros
+    def agregar_viaje_BD(self,id_chofer,origen,destino,fecha,asientos_disp):
+        try:
+            viaje=Viaje.create(id_chofer=id_chofer,origen=origen,destino=destino,fecha=fecha,asientos_disp=asientos_disp)
+            viaje.save()
+        except ErroEnLaBaseDeDatos as e:
+            e.mostrar_mensaje("Error al agregar el viaje")
+    
+    def viajes_en_BD (self,):
+        return Viaje.select()
+    
+    def get_ids(self):
+        try:
+            return [viaje.id_chofer for viaje in Viaje.select()]
+        except Viaje.DoesNotExist:
+            return []
+    
+    def actualizar_asientos_viaje (self,nueva_cant_asientos, id_chofer):
+        try:
+            viaje = Viaje.get(Viaje.id_chofer == id_chofer)
+            viaje.asientos_disp = nueva_cant_asientos
+            viaje.save()
+        except ErroEnLaBaseDeDatos as e:
+            e.mostrar_mensaje("No se encontro el viaje")
+    def eliminar_por_id_BD (self,id):
+        viaje = Viaje.get_or_none(Viaje.id_chofer == id)
+        if viaje is None:
+            error = ErroEnLaBaseDeDatos("No se encontro el viaje")
+            error.mostrar_mensaje("No se encontro el viaje")
+        else:
+            viaje.delete_instance()
+class ErroEnLaBaseDeDatos(Exception):
+    def __init__(self, mensaje):
+        self.mensaje = mensaje
+    def mostrar_mensaje(self,mensaje):
+        messagebox.showerror("Error",mensaje)
